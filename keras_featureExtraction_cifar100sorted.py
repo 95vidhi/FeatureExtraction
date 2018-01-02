@@ -52,8 +52,8 @@ for k in subdir:
 
 """
 
-def load_images(search_path1, search_path2, image_size):
-    images = []
+def load_images(search_path1, image_size):
+    #images = []
     files = []
     labels = []
     subdir = os.listdir(search_path1)
@@ -65,35 +65,22 @@ def load_images(search_path1, search_path2, image_size):
             curcur = os.path.join(cur, val, '*g')
             ls = glob.glob(curcur)
             for fl in ls:
-                image = cv2.imread(fl)
+                """image = cv2.imread(fl)
                 image = cv2.resize(image, (image_size, image_size), 0, 0, cv2.INTER_CUBIC)
                 image = image.astype(np.float64)
-                images.append(image)
+                images.append(image)"""
                 labels.append(k + '__' + val)
             files += ls
     print('Done reading.')
-    subdir = os.listdir(search_path2)
-    print('Going to read images from ', search_path2)
-    for k in subdir:
-        cur = os.path.join(search_path2, k)
-        subsubdir = os.listdir(cur)
-        for val in subsubdir:
-            curcur = os.path.join(cur, val, '*g')
-            ls = glob.glob(curcur)
-            for fl in ls:
-                image = cv2.imread(fl)
-                image = cv2.resize(image, (image_size, image_size), 0, 0, cv2.INTER_CUBIC)
-                image = image.astype(np.float64)
-                images.append(image)
-                labels.append(k + '__' + val)
-            files += ls
-    images = np.array(images)
-    files = np.array(files).astype('S')
+    #images = np.array(images)
+    #files = np.array(files).astype('S')
     labels = np.array(labels).astype('S')
-    print('Done reading.')
-    return images, labels, files
+    return labels, files
 
-train_images, train_labels, train_files = load_images('./image_datasets/data/cifar100/train', './image_datasets/data/cifar100/test', 150)
+train_labels, train_files = load_images('./image_datasets/data/cifar100/train', 150)
+
+num_images = train_labels.shape[0]
+train_images = np.zeros((num_images, 2048), dtype=np.float32)
 
 # create the base pre-trained model
 base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(150, 150, 3))
@@ -113,15 +100,41 @@ for i, layer in enumerate(model.layers):
    print(i, layer.name)
 
 print('Starting train image prediction')
-train_images = model.predict(train_images)
+image_size = 150
+images = []
+idx = 0
+batch_size = 32
+num_batches = num_images/batch_size
+print("Number of batches : ", num_batches, ", each with batch size : ", batch_size)
+batch_num = 0
+for i in range(num_images):
+    if len(images) == batch_size:
+        batch_num = batch_num + 1
+        print("Extracting features for batch number : ", batch_num)
+        features = model.predict(np.array(images))
+        for j in range(features.shape[0]):
+            train_images[idx] = features[j]
+            idx = idx + 1
+        images = []
+    image = cv2.imread(train_files[i])
+    image = cv2.resize(image, (image_size, image_size), 0, 0, cv2.INTER_CUBIC)
+    image = image.astype(np.float32)
+    images.append(image)
+if len(images) != 0:
+    features = model.predict(np.array(images), batch_size=len(images))
+    for j in range(features.shape[0]):
+        train_images[idx] = features[j]
+        idx = idx + 1
 print('Done train image prediction')
 
+train_files = np.array(train_files).astype('S')
 out_file = './features.h5'
 
 print('Writing features to {}'.format(out_file))
 with h5py.File(out_file, 'w') as hf:
     hf.create_dataset("train_images", data=train_images)
     hf.create_dataset("train_labels", data=train_labels)
+    hf.create_dataset("train_files", data=train_files)
 print('Features written successfully')
 
 print('Reading the file')

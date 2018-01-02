@@ -73,7 +73,7 @@ v[2] = k[2]"""
 
 num_images = train_labels.shape[0]
 
-train_images = np.zeros((num_images, 2048), dtype=np.float64)
+train_images = np.zeros((num_images, 2048), dtype=np.float32)
 
 # create the base pre-trained model
 base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(150, 150, 3))
@@ -101,7 +101,7 @@ num_batches = num_images/batch_size
 print("Number of batches : ", num_batches, ", each with batch size : ", batch_size)
 batch_num = 0
 for i in range(num_images):
-    if len(images) == 32:
+    if len(images) == batch_size:
         batch_num = batch_num + 1
         print("Extracting features for batch number : ", batch_num)
         features = model.predict(np.array(images))
